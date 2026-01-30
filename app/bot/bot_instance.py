@@ -7,16 +7,14 @@ from aiogram import Bot, Dispatcher
 from aiogram.client.default import DefaultBotProperties
 from aiogram.enums import ParseMode
 
-load_dotenv()
+from app.core import config
 
-TOKEN = getenv("BOT_TOKEN")
-
-if not TOKEN:
+if not config.BOT_TOKEN:
     logger.critical("BOT_TOKEN не установлен в переменных окружения!")
     sys.exit(1)
 
 dp = Dispatcher()
 bot = Bot(
-    token=TOKEN, 
+    token=config.BOT_TOKEN, 
     default=DefaultBotProperties(parse_mode=ParseMode.HTML)
 )

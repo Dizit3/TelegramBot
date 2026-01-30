@@ -6,6 +6,8 @@ from loguru import logger
 
 from app.core.interfaces import IVideoDownloader
 from app.services.downloader import TikTokDownloader, TikTokBlockError
+from app.utils.ui_utils import create_progress_bar
+import time
 
 router = Router()
 downloader: IVideoDownloader = TikTokDownloader()
@@ -29,7 +31,29 @@ async def tiktok_handler(message: Message) -> None:
     
     try:
         logger.debug(f"Начало загрузки видео: {url}")
-        video_info = await downloader.download(url)
+        
+        last_update_time = 0
+        last_percentage = -1
+
+        async def progress_cb(percentage: float):
+            nonlocal last_update_time, last_percentage
+            # Обновляем не чаще раза в 1.5 сек и только если процент изменился существенно
+            current_time = time.time()
+            if current_time - last_update_time < 1.5:
+                return
+            
+            if int(percentage) == last_percentage:
+                return
+
+            last_update_time = current_time
+            last_percentage = int(percentage)
+            bar = create_progress_bar(percentage)
+            try:
+                await status_msg.edit_text(f"⏳ Загрузка: {bar}")
+            except Exception:
+                pass # Игнорируем ошибки редактирования (например, если сообщение удалено)
+
+        video_info = await downloader.download(url, progress_callback=progress_cb)
         logger.info(f"Видео успешно загружено: {video_info.file_path}")
         
         await message.answer_video(

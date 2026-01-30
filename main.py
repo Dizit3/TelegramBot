@@ -8,6 +8,12 @@ from app.bot.bot_instance import bot, dp
 from app.bot.handlers import tiktok, fallback
 from app.utils.lock_manager import acquire_lock, release_lock
 
+def setup_logging():
+    """Настройка логирования."""
+    logger.remove()
+    logger.add(sys.stdout, format="<green>{time:YYYY-MM-DD HH:mm:ss}</green> | <level>{level: <8}</level> | <cyan>{name}</cyan>:<cyan>{function}</cyan>:<cyan>{line}</cyan> - <level>{message}</level>")
+    logger.add("logs/bot.log", rotation="10 MB", retention="10 days", level="DEBUG")
+
 class InterceptHandler(logging.Handler):
     def emit(self, record):
         try:
@@ -23,11 +29,7 @@ class InterceptHandler(logging.Handler):
         logger.opt(depth=depth, exception=record.exc_info).log(level, record.getMessage())
 
 async def main() -> None:
-    # Настройка loguru
-    logger.remove()
-    logger.add(sys.stdout, format="<green>{time:YYYY-MM-DD HH:mm:ss}</green> | <level>{level: <8}</level> | <cyan>{name}</cyan>:<cyan>{function}</cyan>:<cyan>{line}</cyan> - <level>{message}</level>")
-    logger.add("logs/bot.log", rotation="10 MB", retention="10 days", level="DEBUG")
-
+    setup_logging()
     logger.info("Инициализация запуска бота...")
     
     # 1. Проверка на запущенную копию (с жестким убийством старой)

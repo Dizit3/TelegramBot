@@ -1,6 +1,6 @@
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
-from typing import Optional
+from typing import Optional, Callable, Any, Awaitable
 
 @dataclass
 class VideoInfo:
@@ -14,7 +14,11 @@ class IVideoDownloader(ABC):
     """Интерфейс для загрузчика видео."""
     
     @abstractmethod
-    async def download(self, url: str) -> VideoInfo:
+    async def download(
+        self, 
+        url: str, 
+        progress_callback: Optional[Callable[[float], Awaitable[None]]] = None
+    ) -> VideoInfo:
         """Загрузить видео по ссылке и вернуть информацию о нем."""
         pass
 
