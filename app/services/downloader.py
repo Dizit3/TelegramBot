@@ -7,6 +7,7 @@ from typing import Optional, Callable, Awaitable
 from app.core import config
 from app.core.interfaces import IVideoDownloader, VideoInfo
 from app.utils.file_manager import generate_temp_path
+from app.services.tiktok_images import download_tiktok_images
 
 class TikTokBlockError(Exception):
     """Исключение выбрасывается, когда TikTok блокирует доступ к видео."""
@@ -60,10 +61,30 @@ class TikTokDownloader(IVideoDownloader):
     async def download(
         self, 
         url: str, 
-        progress_callback: Optional[Callable[[float], Awaitable[None]]] = None
+        progress_callback: Optional[Callable[[float], Awaitable[None]]] = None,
+        status_callback: Optional[Callable[[str], Awaitable[None]]] = None
     ) -> VideoInfo:
-        """Загрузка видео в асинхронном режиме."""
+        """Загрузка видео или фото в асинхронном режиме."""
         url = await self._resolve_url(url)
+        
+        # --- НОВОЕ: Пробуем сначала скачать фото-слайдшоу ---
+        logger.debug(f"Проверка на наличие фото-слайдшоу: {url}")
+        image_paths = await download_tiktok_images(url, self.download_dir)
+        
+        if image_paths:
+            logger.success(f"Обнаружено слайд-шоу: {len(image_paths)} фото")
+            if status_callback:
+                await status_callback("слайд-шоу")
+            return VideoInfo(
+                file_path="", 
+                image_paths=image_paths,
+                title="TikTok Slideshow"
+            )
+        
+        if status_callback:
+            await status_callback("видео")
+        
+        # --- Фолбэк на видео (старая логика) ---
         loop = asyncio.get_event_loop()
         
         file_path = generate_temp_path(self.download_dir, "mp4")
@@ -106,7 +127,12 @@ class TikTokDownloader(IVideoDownloader):
             thumbnail_url=info.get('thumbnail')
         )
 
-    async def cleanup(self, file_path: str) -> None:
-        """Удаление временного файла."""
-        if os.path.exists(file_path):
+    async def cleanup(self, file_path: str, image_paths: Optional[list[str]] = None) -> None:
+        """Удаление временных файлов видео и фото."""
+        if file_path and os.path.exists(file_path):
             os.remove(file_path)
+        
+        if image_paths:
+            for path in image_paths:
+                if os.path.exists(path):
+                    os.remove(path)

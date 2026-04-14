@@ -9,15 +9,16 @@ class VideoInfo:
     title: Optional[str] = None
     duration: Optional[int] = None
     thumbnail_url: Optional[str] = None
+    image_paths: Optional[list[str]] = None
 
 class IVideoDownloader(ABC):
     """Интерфейс для загрузчика видео."""
     
-    @abstractmethod
     async def download(
         self, 
         url: str, 
-        progress_callback: Optional[Callable[[float], Awaitable[None]]] = None
+        progress_callback: Optional[Callable[[float], Awaitable[None]]] = None,
+        status_callback: Optional[Callable[[str], Awaitable[None]]] = None
     ) -> VideoInfo:
         """Загрузить видео по ссылке и вернуть информацию о нем."""
         pass

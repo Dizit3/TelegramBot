@@ -4,3 +4,4 @@ python-dotenv
 aiohttp
 aiofiles
 loguru
+httpx

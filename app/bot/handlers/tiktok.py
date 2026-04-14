@@ -1,6 +1,6 @@
 import re
 from aiogram import Router, F, html
-from aiogram.types import Message, FSInputFile
+from aiogram.types import Message, FSInputFile, InputMediaPhoto
 from aiogram.filters import CommandStart
 from loguru import logger
 
@@ -26,14 +26,20 @@ async def tiktok_handler(message: Message) -> None:
         return
 
     url = match.group(0)
-    logger.info(f"Тtiktok_handler: Ссылка найдена: {url}")
-    status_msg = await message.answer("⏳ Загружаю видео из TikTok...")
+    logger.info(f"tiktok_handler: Ссылка найдена: {url}")
+    status_msg = await message.answer("⏳ Анализирую контент TikTok...")
     
     try:
-        logger.debug(f"Начало загрузки видео: {url}")
+        logger.debug(f"Начало обработки: {url}")
         
         last_update_time = 0
         last_percentage = -1
+
+        async def update_status(content_type: str):
+            try:
+                await status_msg.edit_text(f"⏳ Загружаю {content_type} из TikTok...")
+            except Exception:
+                pass
 
         async def progress_cb(percentage: float):
             nonlocal last_update_time, last_percentage
@@ -53,16 +59,29 @@ async def tiktok_handler(message: Message) -> None:
             except Exception:
                 pass # Игнорируем ошибки редактирования (например, если сообщение удалено)
 
-        video_info = await downloader.download(url, progress_callback=progress_cb)
-        logger.info(f"Видео успешно загружено: {video_info.file_path}")
-        
-        await message.answer_video(
-            video=FSInputFile(video_info.file_path),
-            caption=html.quote(video_info.title) if video_info.title else "Вот ваше видео из TikTok!",
+        video_info = await downloader.download(
+            url, 
+            progress_callback=progress_cb,
+            status_callback=update_status
         )
         
-        await downloader.cleanup(video_info.file_path)
-        logger.debug(f"Временный файл удален: {video_info.file_path}")
+        if video_info.image_paths:
+            logger.info(f"Отправка слайд-шоу: {len(video_info.image_paths)} фото")
+            media_group = [InputMediaPhoto(media=FSInputFile(path)) for path in video_info.image_paths]
+            # Добавляем подпись к первому фото
+            if media_group:
+                media_group[0].caption = html.quote(video_info.title) if video_info.title else "Вот ваше слайд-шоу из TikTok!"
+            
+            await message.bot.send_media_group(chat_id=message.chat.id, media=media_group)
+        else:
+            logger.info(f"Видео успешно загружено: {video_info.file_path}")
+            await message.answer_video(
+                video=FSInputFile(video_info.file_path),
+                caption=html.quote(video_info.title) if video_info.title else "Вот ваше видео из TikTok!",
+            )
+        
+        await downloader.cleanup(video_info.file_path, image_paths=video_info.image_paths)
+        logger.debug(f"Временные файлы удалены")
         await status_msg.delete()
         
     except TikTokBlockError as e:
