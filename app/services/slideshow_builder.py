@@ -35,17 +35,22 @@ async def create_slideshow(
         # Для каждого входа: scale -> pad -> setsar -> fps
         filter_parts = []
         for i in range(len(image_paths)):
+            # Если это единственное фото, назовем выход сразу [v], иначе [v{i}]
+            out_label = "[v]" if len(image_paths) == 1 else f"[v{i}]"
             part = (
                 f"[{i}:v]scale=720:1280:force_original_aspect_ratio=decrease,"
-                f"pad=720:1280:(ow-iw)/2:(oh-ih)/2,setsar=1,fps={fps}[v{i}];"
+                f"pad=720:1280:(ow-iw)/2:(oh-ih)/2,setsar=1,fps={fps}{out_label}"
             )
             filter_parts.append(part)
         
-        # Склейка всех потоков v0, v1, v2...
-        concat_input = "".join([f"[v{i}]" for i in range(len(image_paths))])
-        concat_filter = f"{concat_input}concat=n={len(image_paths)}:v=1:a=0[v]"
-        
-        full_filter = "".join(filter_parts) + concat_filter
+        # Если фото больше одного, добавляем фильтр склейки (concat)
+        if len(image_paths) > 1:
+            full_filter = ";".join(filter_parts) + ";"
+            concat_input = "".join([f"[v{i}]" for i in range(len(image_paths))])
+            concat_filter = f"{concat_input}concat=n={len(image_paths)}:v=1:a=0[v]"
+            full_filter += concat_filter
+        else:
+            full_filter = filter_parts[0]
         
         cmd.extend(["-filter_complex", full_filter])
 
