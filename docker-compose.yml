@@ -1,0 +1,17 @@
+services:
+  bot:
+    build: .
+    container_name: tiktok_downloader_bot
+    restart: always
+    env_file:
+      - .env
+    volumes:
+      - ./settings.json:/app/settings.json
+      - ./logs:/app/logs
+      - ./temp:/app/temp
+    # Логирование Docker контейнера
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
