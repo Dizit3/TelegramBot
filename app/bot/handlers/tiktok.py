@@ -121,7 +121,7 @@ async def tiktok_handler(
         )
 
         current_mode = user_settings.get_mode(target_user_id)
-        keyboard = get_mode_keyboard(url, current_mode)
+        keyboard = get_mode_keyboard(url, current_mode) if video_info.image_paths else None
 
         if not video_info.file_path and video_info.image_paths:
             logger.info(f"Отправка слайд-шоу: {len(video_info.image_paths)} фото")
@@ -134,9 +134,10 @@ async def tiktok_handler(
                 )
 
             await message.bot.send_media_group(chat_id=message.chat.id, media=media_group)
-            await message.answer(
-                "Используйте кнопку ниже, чтобы изменить формат:", reply_markup=keyboard
-            )
+            if keyboard:
+                await message.answer(
+                    "Используйте кнопку ниже, чтобы изменить формат:", reply_markup=keyboard
+                )
         else:
             logger.info(f"Видео успешно загружено: {video_info.file_path}")
             await message.answer_video(

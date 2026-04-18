@@ -11,7 +11,9 @@ downloads/
 logs/
 bot.lock
 bot.log
+deploy.tar.gz
 *.mp4
+
 
 *.jpg
 *.png
