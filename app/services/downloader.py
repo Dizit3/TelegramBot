@@ -8,6 +8,8 @@ from app.core import config
 from app.core.interfaces import IVideoDownloader, VideoInfo
 from app.utils.file_manager import generate_temp_path
 from app.services.tiktok_images import download_tiktok_images
+from app.services.slideshow_builder import create_slideshow
+from app.utils.user_settings import user_settings
 
 class TikTokBlockError(Exception):
     """Исключение выбрасывается, когда TikTok блокирует доступ к видео."""
@@ -62,19 +64,42 @@ class TikTokDownloader(IVideoDownloader):
         self, 
         url: str, 
         progress_callback: Optional[Callable[[float], Awaitable[None]]] = None,
-        status_callback: Optional[Callable[[str], Awaitable[None]]] = None
+        status_callback: Optional[Callable[[str], Awaitable[None]]] = None,
+        user_id: Optional[int] = None
     ) -> VideoInfo:
         """Загрузка видео или фото в асинхронном режиме."""
         url = await self._resolve_url(url)
         
         # --- НОВОЕ: Пробуем сначала скачать фото-слайдшоу ---
         logger.debug(f"Проверка на наличие фото-слайдшоу: {url}")
-        image_paths = await download_tiktok_images(url, self.download_dir)
+        res = await download_tiktok_images(url, self.download_dir)
         
-        if image_paths:
-            logger.success(f"Обнаружено слайд-шоу: {len(image_paths)} фото")
+        if res:
+            image_paths, audio_path = res
+            logger.success(f"Обнаружен фото-пост: {len(image_paths)} фото")
+            
+            # Определяем режим пользователя
+            mode = user_settings.get_mode(user_id) if user_id else "video"
+            
+            if mode == "video":
+                if status_callback:
+                    await status_callback("слайд-шоу (монтаж видео...)")
+                
+                # Собираем видео через ffmpeg
+                video_path = await create_slideshow(image_paths, audio_path, self.download_dir)
+                if video_path:
+                    # Возвращаем как обычное видео
+                    return VideoInfo(
+                        file_path=video_path,
+                        image_paths=image_paths, # Оставляем для cleanup
+                        title="TikTok Slideshow"
+                    )
+                else:
+                    logger.warning("Не удалось собрать слайдшоу, откатываемся к фото-альбому")
+
+            # Режим 'images' или если монтаж видео не удался
             if status_callback:
-                await status_callback("слайд-шоу")
+                await status_callback("слайд-шоу (фото-альбом)")
             return VideoInfo(
                 file_path="", 
                 image_paths=image_paths,
@@ -84,7 +109,7 @@ class TikTokDownloader(IVideoDownloader):
         if status_callback:
             await status_callback("видео")
         
-        # --- Фолбэк на видео (старая логика) ---
+        # --- Фолбэк на видео (через yt-dlp) ---
         loop = asyncio.get_event_loop()
         
         file_path = generate_temp_path(self.download_dir, "mp4")
@@ -96,19 +121,15 @@ class TikTokDownloader(IVideoDownloader):
                 downloaded = d.get('downloaded_bytes', 0)
                 if total:
                     percentage = (downloaded / total) * 100
-                    # Вызываем асинхронный коллбэк из основного потока
                     asyncio.run_coroutine_threadsafe(progress_callback(percentage), loop)
 
         if progress_callback:
             ydl_opts['progress_hooks'] = [_progress_hook]
 
-        # Запускаем блокирующую операцию yt-dlp в отдельном потоке
         def _download():
-            logger.debug(f"Запуск yt-dlp для URL: {url}")
             with yt_dlp.YoutubeDL(ydl_opts) as ydl:
                 try:
                     info = ydl.extract_info(url, download=True)
-                    logger.info(f"Информация о видео извлечена: {info.get('title')}")
                     return info
                 except Exception as e:
                     logger.error(f"Ошибка yt-dlp: {e}")
@@ -116,10 +137,10 @@ class TikTokDownloader(IVideoDownloader):
 
         try:
             info = await loop.run_in_executor(None, _download)
-            logger.success(f"Загрузка завершена: {file_path}")
         except Exception as e:
             logger.exception("Не удалось загрузить видео через yt-dlp")
             raise
+
         return VideoInfo(
             file_path=file_path,
             title=info.get('title'),
@@ -128,10 +149,12 @@ class TikTokDownloader(IVideoDownloader):
         )
 
     async def cleanup(self, file_path: str, image_paths: Optional[list[str]] = None) -> None:
-        """Удаление временных файлов видео и фото."""
+        """Удаление временных файлов."""
+        # Удаляем видео
         if file_path and os.path.exists(file_path):
             os.remove(file_path)
         
+        # Удаляем картинки
         if image_paths:
             for path in image_paths:
                 if os.path.exists(path):

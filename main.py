@@ -5,7 +5,7 @@ from loguru import logger
 from aiogram.types import Message
 
 from app.bot.bot_instance import bot, dp
-from app.bot.handlers import tiktok, fallback
+from app.bot.handlers import tiktok, settings, fallback
 from app.utils.lock_manager import acquire_lock, release_lock
 
 def setup_logging():
@@ -43,6 +43,7 @@ async def main() -> None:
         # 3. Регистрация роутеров
         # 3. Регистрация роутеров в строгом порядке
         logger.debug("Подключение роутеров...")
+        dp.include_router(settings.router)
         dp.include_router(tiktok.router)
         dp.include_router(fallback.router)  # Фолбэк должен быть последним
         

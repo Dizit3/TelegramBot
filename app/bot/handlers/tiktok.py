@@ -62,10 +62,12 @@ async def tiktok_handler(message: Message) -> None:
         video_info = await downloader.download(
             url, 
             progress_callback=progress_cb,
-            status_callback=update_status
+            status_callback=update_status,
+            user_id=message.from_user.id
         )
         
-        if video_info.image_paths:
+        # Если file_path пустой, значит мы в режиме "Альбом фото" или видео не собралось
+        if not video_info.file_path and video_info.image_paths:
             logger.info(f"Отправка слайд-шоу: {len(video_info.image_paths)} фото")
             media_group = [InputMediaPhoto(media=FSInputFile(path)) for path in video_info.image_paths]
             # Добавляем подпись к первому фото

@@ -18,7 +18,8 @@ class IVideoDownloader(ABC):
         self, 
         url: str, 
         progress_callback: Optional[Callable[[float], Awaitable[None]]] = None,
-        status_callback: Optional[Callable[[str], Awaitable[None]]] = None
+        status_callback: Optional[Callable[[str], Awaitable[None]]] = None,
+        user_id: Optional[int] = None
     ) -> VideoInfo:
         """Загрузить видео по ссылке и вернуть информацию о нем."""
         pass
