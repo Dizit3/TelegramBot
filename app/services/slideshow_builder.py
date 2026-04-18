@@ -45,7 +45,7 @@ async def create_slideshow(
         return None
 
     output_path = generate_temp_path(output_dir, "mp4")
-    fps = 25
+    fps = 10  # 10 кадров в секунду достаточно для слайд-шоу и сильно ускоряет монтаж
     
     # 1. Получаем длительность аудио и рассчитываем тайминги
     audio_duration = await get_audio_duration(audio_path)
@@ -78,7 +78,7 @@ async def create_slideshow(
     num_v_cycles = math.ceil(final_video_dur / cycle_dur)
     final_image_list = image_paths * num_v_cycles
     
-    logger.info(f"Slideshow: audio={audio_duration}s, max_loop_limit={max_loops_dur}s, slide={slide_dur}s, total={final_video_dur}s")
+    logger.info(f"Slideshow (Turbo): audio={audio_duration}s, slide={slide_dur}s, total={final_video_dur}s")
     
     # Сколько раз нужно повторить аудио (для старых ffmpeg, где нет -stream_loop)
     num_a_repeats = 1
@@ -103,6 +103,7 @@ async def create_slideshow(
         first_audio_idx = len(final_image_list)
 
         # ВТОРАЯ ЧАСТЬ: Формируем -filter_complex
+        # Оптимизировано: разрешение 480x854 (480p)
         filter_parts = []
         
         # Обработка видео (масштабирование)
@@ -110,8 +111,8 @@ async def create_slideshow(
         for i in range(num_total_v_frames):
             out_label = "[v_out]" if num_total_v_frames == 1 else f"[v{i}]"
             part = (
-                f"[{i}:v]scale=720:1280:force_original_aspect_ratio=decrease,"
-                f"pad=720:1280:(ow-iw)/2:(oh-ih)/2,setsar=1,fps={fps}{out_label}"
+                f"[{i}:v]scale=480:854:force_original_aspect_ratio=decrease,"
+                f"pad=480:854:(ow-iw)/2:(oh-ih)/2,setsar=1,fps={fps}{out_label}"
             )
             filter_parts.append(part)
         
@@ -137,8 +138,13 @@ async def create_slideshow(
         
         cmd.extend(["-t", str(final_video_dur)])
         cmd.extend([
-            "-c:v", "libx264", "-pix_fmt", "yuv420p",
-            "-movflags", "+faststart", output_path
+            "-c:v", "libx264", 
+            "-pix_fmt", "yuv420p",
+            "-preset", "ultrafast",   # Максимальная скорость кодирования
+            "-tune", "stillimage",    # Оптимизация под слайд-шоу
+            "-threads", "0",          # Использовать все ядра процессора
+            "-movflags", "+faststart", 
+            output_path
         ])
 
         process = await asyncio.create_subprocess_exec(
