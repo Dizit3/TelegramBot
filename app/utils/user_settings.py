@@ -34,4 +34,11 @@ class UserSettings:
         self.settings[str(user_id)]["mode"] = mode
         self._save_settings()
 
+    def toggle_mode(self, user_id: int) -> str:
+        """Переключает режим пользователя (images <-> video) и возвращает новый."""
+        current = self.get_mode(user_id)
+        new_mode = "images" if current == "video" else "video"
+        self.set_mode(user_id, new_mode)
+        return new_mode
+
 user_settings = UserSettings()
