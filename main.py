@@ -1,18 +1,23 @@
 import asyncio
-import sys
 import logging
+import sys
+
 from loguru import logger
-from aiogram.types import Message
 
 from app.bot.bot_instance import bot, dp
-from app.bot.handlers import tiktok, settings, fallback
+from app.bot.handlers import fallback, settings, tiktok
 from app.utils.lock_manager import acquire_lock, release_lock
+
 
 def setup_logging():
     """Настройка логирования."""
     logger.remove()
-    logger.add(sys.stdout, format="<green>{time:YYYY-MM-DD HH:mm:ss}</green> | <level>{level: <8}</level> | <cyan>{name}</cyan>:<cyan>{function}</cyan>:<cyan>{line}</cyan> - <level>{message}</level>")
+    logger.add(
+        sys.stdout,
+        format="<green>{time:YYYY-MM-DD HH:mm:ss}</green> | <level>{level: <8}</level> | <cyan>{name}</cyan>:<cyan>{function}</cyan>:<cyan>{line}</cyan> - <level>{message}</level>",
+    )
     logger.add("logs/bot.log", rotation="10 MB", retention="10 days", level="DEBUG")
+
 
 class InterceptHandler(logging.Handler):
     def emit(self, record):
@@ -28,27 +33,27 @@ class InterceptHandler(logging.Handler):
 
         logger.opt(depth=depth, exception=record.exc_info).log(level, record.getMessage())
 
+
 async def main() -> None:
     setup_logging()
     logger.info("Инициализация запуска бота...")
-    
+
     # 1. Проверка на запущенную копию (с жестким убийством старой)
     acquire_lock()
-    
+
     try:
         logger.info("Очистка старых сессий Telegram...")
-        # 2. Удаляем вебхук и сбрасываем старые сообщения ПЕРЕД регистрацией роутеров
+        # 2. Удаляем вебхук и сбрасываем старые сообщения
         await bot.delete_webhook(drop_pending_updates=True)
-        
-        # 3. Регистрация роутеров
+
         # 3. Регистрация роутеров в строгом порядке
         logger.debug("Подключение роутеров...")
         dp.include_router(settings.router)
         dp.include_router(tiktok.router)
         dp.include_router(fallback.router)  # Фолбэк должен быть последним
-        
+
         logger.success("BOT_READY: TikTok Downloader Bot успешно запущен!")
-        
+
         # 4. Запуск polling
         await dp.start_polling(bot)
     except asyncio.CancelledError:
@@ -56,9 +61,10 @@ async def main() -> None:
     except Exception as e:
         logger.exception(f"Критическая ошибка при работе бота: {e}")
     finally:
-        # Освобождаем блокировку при выключении
+        # Освобождаем блокировку при завершении
         logger.info("Завершение работы, освобождение блокировки...")
         release_lock()
+
 
 if __name__ == "__main__":
     try:

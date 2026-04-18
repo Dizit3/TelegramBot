@@ -8,8 +8,11 @@ __pycache__/
 temp/
 temp_downloads/
 downloads/
+logs/
+bot.lock
 bot.log
 *.mp4
+
 *.jpg
 *.png
 *.webp

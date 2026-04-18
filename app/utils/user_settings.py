@@ -1,8 +1,10 @@
 import json
 import os
+
 from app.core import config
 
 SETTINGS_FILE = os.path.join(config.BASE_DIR, "settings.json")
+
 
 class UserSettings:
     def __init__(self):
@@ -40,5 +42,6 @@ class UserSettings:
         new_mode = "images" if current == "video" else "video"
         self.set_mode(user_id, new_mode)
         return new_mode
+
 
 user_settings = UserSettings()

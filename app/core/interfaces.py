@@ -1,25 +1,29 @@
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
-from typing import Optional, Callable, Any, Awaitable
+from typing import Awaitable, Callable, Optional
+
 
 @dataclass
 class VideoInfo:
     """Модель данных для информации о видео."""
+
     file_path: str
     title: Optional[str] = None
     duration: Optional[int] = None
     thumbnail_url: Optional[str] = None
     image_paths: Optional[list[str]] = None
 
+
 class IVideoDownloader(ABC):
     """Интерфейс для загрузчика видео."""
-    
+
+    @abstractmethod
     async def download(
-        self, 
-        url: str, 
+        self,
+        url: str,
         progress_callback: Optional[Callable[[float], Awaitable[None]]] = None,
         status_callback: Optional[Callable[[str], Awaitable[None]]] = None,
-        user_id: Optional[int] = None
+        user_id: Optional[int] = None,
     ) -> VideoInfo:
         """Загрузить видео по ссылке и вернуть информацию о нем."""
         pass
